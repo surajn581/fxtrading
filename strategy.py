@@ -1,6 +1,22 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import zscore
+
+def calculate_impulse_macd(data, short_period=12, long_period=26, signal_period=9):
+    # Calculate MACD
+    data['EMA_short'] = data['mid'].ewm(span=short_period, min_periods=short_period).mean()
+    data['EMA_long'] = data['mid'].ewm(span=long_period, min_periods=long_period).mean()
+    data['MACD'] = data['EMA_short'] - data['EMA_long']
+    
+    # Calculate Signal Line
+    data['Signal_line'] = data['MACD'].ewm(span=signal_period, min_periods=signal_period).mean()
+    
+    # Calculate Impulse Line (difference between MACD and Signal Line)
+    data['Impulse_Line'] = data['MACD'] - data['Signal_line']
+    
+    # Calculate Impulse Histogram (difference between Impulse Line and its previous value)
+    data['Impulse_Histogram'] = data['Impulse_Line'].diff()
+    
+    return data
 
 def calculate_technical_indicators(data):
     # Calculate Moving Averages (SMA)
@@ -19,6 +35,8 @@ def calculate_technical_indicators(data):
     data['std_dev'] = data['mid'].rolling(window=20).std()
     data['upper_band'] = data['middle_band'] + 2 * data['std_dev']
     data['lower_band'] = data['middle_band'] - 2 * data['std_dev']
+
+    data = calculate_impulse_macd(data)
     
     return data
 
