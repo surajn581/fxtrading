@@ -1,27 +1,19 @@
 import pandas as pd
 import numpy as np
 
-def calculate_impulse_macd(data, short_period=12, long_period=26, signal_period=9):
+def calculate_macd(data, short_period=12, long_period=26, signal_period=9):
     # Calculate MACD
     data['EMA_short'] = data['mid'].ewm(span=short_period, min_periods=short_period).mean()
     data['EMA_long'] = data['mid'].ewm(span=long_period, min_periods=long_period).mean()
-    data['MACD'] = data['EMA_short'] - data['EMA_long']
-    
+    data['MACD'] = data['EMA_short'] - data['EMA_long']    
     # Calculate Signal Line
     data['Signal_line'] = data['MACD'].ewm(span=signal_period, min_periods=signal_period).mean()
-    
-    # Calculate Impulse Line (difference between MACD and Signal Line)
-    data['Impulse_Line'] = data['MACD'] - data['Signal_line']
-    
-    # Calculate Impulse Histogram (difference between Impulse Line and its previous value)
-    data['Impulse_Histogram'] = data['Impulse_Line'].diff()
-    
     return data
 
 def calculate_technical_indicators(data):
     # Calculate Moving Averages (SMA)
-    data['SMA_20'] = data['mid'].rolling(window=20).mean()
-    data['SMA_50'] = data['mid'].rolling(window=50).mean()
+    data['SMA_short'] = data['mid'].rolling(window=10).mean()
+    data['SMA_long'] = data['mid'].rolling(window=50).mean()
     
     # Calculate Relative Strength Index (RSI)
     delta = data['mid'].diff()
@@ -29,51 +21,53 @@ def calculate_technical_indicators(data):
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     data['RSI'] = 100 - (100 / (1 + rs))
-    
-    # Calculate Bollinger Bands
-    data['middle_band'] = data['mid'].rolling(window=20).mean()
-    data['std_dev'] = data['mid'].rolling(window=20).std()
-    data['upper_band'] = data['middle_band'] + 2 * data['std_dev']
-    data['lower_band'] = data['middle_band'] - 2 * data['std_dev']
+    data = calculate_macd(data)
+    return data
 
-    data = calculate_impulse_macd(data)
-    
+def sma_signal(data):
+    data['signal'] = -1
+    data['sma_signal'] = None
+    data.loc[(data['SMA_short'] > data['SMA_long']), 'signal'] = 1
+    data.loc[(data['SMA_short'] < data['SMA_long']), 'signal'] = 0
+    data['signal'] = data['signal'].diff()
+    data.loc[(data['signal'] == -1), 'sma_signal'] = 1
+    data.loc[(data['signal'] == 1), 'sma_signal'] = -1
+    data.drop(columns=['signal'], inplace=True)
+    data['sma_signal'] = data['sma_signal'].fillna(0)
+    return data
+
+def rsi_signal(data):
+    data['signal'] = -1
+    data['rsi_signal'] = None
+    data.loc[(data['RSI'] >= 70), 'signal'] = 0
+    data.loc[(data['RSI'] <= 30), 'signal'] = 1
+    data['signal'] = data['signal'].diff()
+    data.loc[(data['signal'] == 2), 'rsi_signal'] = 1
+    data.loc[(data['signal'] == 1), 'rsi_signal'] = -1
+    data.drop(columns=['signal'], inplace=True)
+    data['rsi_signal'] = data['rsi_signal'].fillna(0)
+    return data
+
+def macd_signal(data):    
+    data['signal'] = 0
+    data['macd_signal'] = None
+    data.loc[(data['MACD'] > data['Signal_line']), 'signal'] = 1
+    data.loc[(data['MACD'] < data['Signal_line']), 'signal'] = 0
+    data['signal'] = data['signal'].diff()
+    data.loc[(data['signal'] == -1), 'macd_signal'] = -1
+    data.loc[(data['signal'] == 1), 'macd_signal'] = 1
+    data.drop(columns=['signal'], inplace=True)
+    data['macd_signal'] = data['macd_signal'].fillna(0)
     return data
 
 def generate_signals(data):
-    signals = pd.DataFrame(index=data.index)
-    signals['action'] = 'Hold'
-    signals['amount'] = 0
-    
-    # Calculate technical indicators
     data = calculate_technical_indicators(data)
-    
-    # Generate signals based on indicators
-    signals['signal'] = 0  # 0 means hold
-    
-    # Buy signals
-    signals.loc[(data['SMA_10'] > data['SMA_50']) & 
-                (data['RSI'] < 30) & 
-                (data['mid'] < data['lower_band']) & 
-                (data['Impulse_Histogram'] > 0), 'signal'] = 1
-    
-    # Sell signals
-    signals.loc[(data['SMA_10'] < data['SMA_50']) & 
-                (data['RSI'] > 70) & 
-                (data['mid'] > data['upper_band']) & 
-                (data['Impulse_Histogram'] < 0), 'signal'] = -1
-    
-    # Determine actions and amounts
-    signals.loc[signals['signal'] == 1, 'action'] = 'Buy'
-    signals.loc[signals['signal'] == -1, 'action'] = 'Sell'
-    
-    # Assuming a fixed amount to trade (you can adjust this based on your strategy)
-    signals.loc[signals['signal'] != 0, 'amount'] = 100  # Example: Trading 100 units each time
-    
-    return signals[['action', 'amount']]
-
-# Example usage:
-# Assume 'data' is your pandas DataFrame with columns 'mid', 'quoteSize', and 'timeStamp'
+    data = sma_signal(data)
+    data = rsi_signal(data)
+    data = macd_signal(data)
+    final_signal = data['sma_signal'] + data['rsi_signal'] + data['macd_signal']
+    data['signal'] = final_signal
+    return data
 
 def loadData():
 # Generate example data (simulate 180 days of 5-minute data)
