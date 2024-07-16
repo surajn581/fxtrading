@@ -52,10 +52,16 @@ def generate_signals(data):
     signals['signal'] = 0  # 0 means hold
     
     # Buy signals
-    signals.loc[(data['SMA_20'] > data['SMA_50']) & (data['RSI'] < 30) & (data['mid'] < data['lower_band']), 'signal'] = 1
+    signals.loc[(data['SMA_10'] > data['SMA_50']) & 
+                (data['RSI'] < 30) & 
+                (data['mid'] < data['lower_band']) & 
+                (data['Impulse_Histogram'] > 0), 'signal'] = 1
     
     # Sell signals
-    signals.loc[(data['SMA_20'] < data['SMA_50']) & (data['RSI'] > 70) & (data['mid'] > data['upper_band']), 'signal'] = -1
+    signals.loc[(data['SMA_10'] < data['SMA_50']) & 
+                (data['RSI'] > 70) & 
+                (data['mid'] > data['upper_band']) & 
+                (data['Impulse_Histogram'] < 0), 'signal'] = -1
     
     # Determine actions and amounts
     signals.loc[signals['signal'] == 1, 'action'] = 'Buy'
