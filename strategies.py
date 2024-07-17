@@ -33,7 +33,12 @@ class StrategyBase:
 class StatefullStrategyBase(StrategyBase):
 
     PreviousBuyPrice = np.inf
-    PreiousSellPrice = 0
+    PreviousSellPrice = 0
+    PreviousBuyAverage = 0
+    PreviousBuyCount = 0
+
+    def __init__(self, is_statefull = True):
+        self.is_statefull = is_statefull
 
     @abstractmethod
     def add_inicators(self, data, **kwargs):
@@ -48,26 +53,31 @@ class StatefullStrategyBase(StrategyBase):
     @classmethod
     def statefull_action(cls, action, current_price):
         if action == 1:
-            # TODO
-            # update the prev buy price only when current buy price is higher than the last so that if we keep buying
-            # the dip, we will not sell them until the current price is higher than our max buy price
-            #if current_price > cls.PreviousBuyPrice:
-            cls.PreviousBuyPrice = current_price
+            cls.PreviousBuyAverage = ( (cls.PreviousBuyCount*cls.PreviousBuyAverage)+current_price )/(cls.PreviousBuyCount+1)
+            cls.PreviousBuyCount = cls.PreviousBuyCount + 1
             return action
-        if action == -1 and cls.PreviousBuyPrice*1.005 < current_price:     #multipying by 1.005 so that we make atleast 0.5% profit on each sell
+        if (action == -1) and (cls.PreviousBuyAverage < current_price):     #multipying by 1.005 so that we make atleast 0.5% profit on each sell
+            print('sold at profit: {} avg buy price: {} current price: {}'.format(current_price-cls.PreviousBuyAverage, cls.PreviousBuyAverage, current_price))
             cls.PreiousSellPrice = current_price
+            cls.PreviousBuyAverage = 0
+            cls.PreviousBuyCount = 0
             return action
+        elif action == -1:
+            print('sell recommended but avg buy price: {} > current price: {}'.format(cls.PreviousBuyAverage, current_price))
+            return 0
         return 0
     
     def action(self, data, **kwargs):
         action = super().action(data, **kwargs)
-        current_price = data[self.price_column].to_list()[-1]
-        action = self.__class__.statefull_action( action, current_price )
+        if self.is_statefull:
+            current_price = data[self.price_column].to_list()[-1]
+            action = self.__class__.statefull_action( action, current_price )
         return action
     
 class SMA( StatefullStrategyBase ):
 
-    def __init__( self, short_period = 10, long_period = 50, price_column = 'mid' ):
+    def __init__( self, short_period = 10, long_period = 50, price_column = 'mid', is_statefull = True ):
+        super().__init__(is_statefull=is_statefull)
         self.short_period = short_period
         self.long_period = long_period
         self.price_column = price_column
@@ -82,7 +92,8 @@ class SMA( StatefullStrategyBase ):
     
 class RSI( StatefullStrategyBase ):
 
-    def __init__( self, period = 14, price_column = 'mid' ):
+    def __init__( self, period = 14, price_column = 'mid', is_statefull = True ):
+        super().__init__(is_statefull=is_statefull)
         self.period = period
         self.price_column = price_column
 
@@ -96,7 +107,8 @@ class RSI( StatefullStrategyBase ):
     
 class MACD( StatefullStrategyBase ):
 
-    def __init__( self, short_period=12, long_period=26, signal_period=9, price_column = 'mid' ):
+    def __init__( self, short_period=12, long_period=26, signal_period=9, price_column = 'mid', is_statefull = True ):
+        super().__init__(is_statefull=is_statefull)
         self.short_period = short_period
         self.long_period = long_period
         self.signal_period = signal_period
@@ -125,20 +137,31 @@ class CompositeStrategyBase:
 class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
     PreviousBuyPrice = np.inf
-    PreiousSellPrice = 0
+    PreviousSellPrice = 0
+    PreviousBuyAverage = 0
+    PreviousBuyCount = 0
+    TotalProfit = 0
 
     @classmethod
     def statefull_action(cls, action, current_price):
         if action == 1:
-            # TODO
-            # update the prev buy price only when current buy price is higher than the last so that if we keep buying
-            # the dip, we will not sell them until the current price is higher than our max buy price
-            #if current_price > cls.PreviousBuyPrice:
-            cls.PreviousBuyPrice = current_price
+            # maintaining a running average of our buying price so that we can use it to sell only when the selling price > avg buying price
+            cls.PreviousBuyAverage = ( (cls.PreviousBuyCount*cls.PreviousBuyAverage)+current_price )/(cls.PreviousBuyCount+1)
+            cls.PreviousBuyCount = cls.PreviousBuyCount + 1
             return action
-        if action == -1 and cls.PreviousBuyPrice < current_price:
+        if (action == -1) and (cls.PreviousBuyCount>0) and (cls.PreviousBuyAverage < current_price):
+            print('sold at profit: {} avg buy price: {} current price: {}'.format(current_price-cls.PreviousBuyAverage, cls.PreviousBuyAverage, current_price))
+            cls.TotalProfit = cls.TotalProfit + (current_price-cls.PreviousBuyAverage)
             cls.PreiousSellPrice = current_price
+            cls.PreviousBuyAverage = 0
+            cls.PreviousBuyCount = 0            
+            print('total profit: {}'.format(cls.TotalProfit))
             return action
+        elif action == -1:
+            if cls.PreviousBuyCount==0:
+                print('nothing to sell')
+            else:
+                print('sell recommended but avg buy price: {} > current price: {}'.format(cls.PreviousBuyAverage, current_price))
         return 0
     
     def action(self, data, **kwargs):
