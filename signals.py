@@ -10,17 +10,23 @@ def calculate_macd(data, short_period=12, long_period=26, signal_period=9):
     data['Signal_line'] = data['MACD'].ewm(span=signal_period, min_periods=signal_period).mean()
     return data
 
-def calculate_technical_indicators(data):
+def calculate_sma(data, short_period = 10, long_period = 50):
     # Calculate Moving Averages (SMA)
-    data['SMA_short'] = data['mid'].rolling(window=10).mean()
-    data['SMA_long'] = data['mid'].rolling(window=50).mean()
-    
-    # Calculate Relative Strength Index (RSI)
+    data['SMA_short'] = data['mid'].rolling(window=short_period).mean()
+    data['SMA_long'] = data['mid'].rolling(window=long_period).mean()
+    return data
+
+def calculate_rsi(data, period = 14):
     delta = data['mid'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss
     data['RSI'] = 100 - (100 / (1 + rs))
+    return data
+
+def calculate_technical_indicators(data):
+    data = calculate_sma(data)    
+    data = calculate_rsi(data)
     data = calculate_macd(data)
     return data
 
@@ -69,22 +75,9 @@ def generate_signals(data):
     data['signal'] = final_signal
     return data
 
-def loadData():
-# Generate example data (simulate 180 days of 5-minute data)
-    np.random.seed(0)
-    dates = pd.date_range(end=pd.Timestamp.now(), periods=180*24*12, freq='5T')
-    data = pd.DataFrame({
-        'mid': np.random.uniform(1.1, 1.2, len(dates)),  # Simulating mid prices
-        'quoteSize': np.random.randint(1000, 5000, len(dates)),
-        'timeStamp': dates
-    })
+def loadData(nrows = 287*30, head = False):
+    data = pd.read_csv('EURUSD5.csv', delimiter='\t', header=None, names=['timeStamp', 'open', 'high', 'low', 'close', 'volume'])
+    data = data[['timeStamp', 'close']]
+    data.rename(columns={'close':'mid'}, inplace=True)
+    data = data.head(nrows) if head else data.tail(nrows)
     return data
-
-def doTrading():
-    data = loadData()
-    # Apply trading strategy
-    signals = generate_signals(data)
-
-    print(signals.tail())  # Print the last few rows of signals DataFrame
-
-    return signals
