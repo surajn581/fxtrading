@@ -77,7 +77,7 @@ def generate_signals(data):
 
 def loadData(nrows = 287*30, head = False):
     data = pd.read_csv('EURUSD5.csv', delimiter='\t', header=None, names=['timeStamp', 'open', 'high', 'low', 'close', 'volume'])
-    data = data[['timeStamp', 'close']]
-    data.rename(columns={'close':'mid'}, inplace=True)
+    data = data[['timeStamp', 'close', 'volume']]
+    data.rename(columns={'close':'mid', 'volume': 'quoteSize'}, inplace=True)
     data = data.head(nrows) if head else data.tail(nrows)
     return data
