@@ -137,15 +137,6 @@ class CompositeStrategyBase:
     
 class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
-    BaseTradeQuantity       = 1000
-    PreviousBuyPrice        = np.inf
-    PreviousSellPrice       = 0
-    PreviousBuyAverage      = 0
-    PreviousBuyCount        = 0
-    TotalProfit             = 0    
-    PreviousTickBuyMiss     = 0    #holds the quantity that is yet to be purchased
-    PreviousTickSellMiss    = 0    #holds the quantity that is yet to be sold
-
     def __init__(self, base_trade_quantity = 1000, **kwargs):
         super().__init__(**kwargs)
         self.__class__.clear()
@@ -159,8 +150,8 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
         cls.PreviousBuyAverage      = 0
         cls.PreviousBuyCount        = 0
         cls.TotalProfit             = 0    
-        cls.PreviousTickBuyMiss     = 0
-        cls.PreviousTickSellMiss    = 0
+        cls.PreviousTickBuyMiss     = 0     #holds the quantity that is yet to be purchased
+        cls.PreviousTickSellMiss    = 0     #holds the quantity that is yet to be sold
 
     @classmethod
     def statefull_action(cls, action, current_price):
