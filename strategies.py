@@ -137,30 +137,41 @@ class CompositeStrategyBase:
     
 class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
-    BaseTradeQuantity = 1000
-    PreviousBuyPrice = np.inf
-    PreviousSellPrice = 0
-    PreviousBuyAverage = 0
-    PreviousBuyCount = 0
-    TotalProfit = 0
+    BaseTradeQuantity       = 1000
+    PreviousBuyPrice        = np.inf
+    PreviousSellPrice       = 0
+    PreviousBuyAverage      = 0
+    PreviousBuyCount        = 0
+    TotalProfit             = 0    
+    PreviousTickBuyMiss     = 0    #holds the quantity that is yet to be purchased
+    PreviousTickSellMiss    = 0    #holds the quantity that is yet to be sold
 
-    #holds the quantity that is yet to be purchased
-    PreviousTickBuyMiss = 0
-
-    #holds the quantity that is yet to be sold
-    PreviousTickSellMiss = 0
+    def __init__(self, base_trade_quantity = 1000, **kwargs):
+        super().__init__(**kwargs)
+        self.__class__.clear()
+        self.__class__.BaseTradeQuantity = base_trade_quantity
 
     @classmethod
-    def statefull_action(cls, action, current_price, current_volume):
+    def clear(cls):
+        cls.BaseTradeQuantity       = 1000
+        cls.PreviousBuyPrice        = np.inf
+        cls.PreviousSellPrice       = 0
+        cls.PreviousBuyAverage      = 0
+        cls.PreviousBuyCount        = 0
+        cls.TotalProfit             = 0    
+        cls.PreviousTickBuyMiss     = 0
+        cls.PreviousTickSellMiss    = 0
+
+    @classmethod
+    def statefull_action(cls, action, current_price):
         if action == 0:
-            if cls.PreviousTickBuyMiss:
+            if cls.PreviousTickSellMiss:
                 action = 1            
-            elif cls.PreviousTickSellMiss:
+            elif cls.PreviousTickBuyMiss:
                 action = -1
             else:
                 return action
-        if action in [1, 2, 3]:
-            # maintaining a running average of our buying price so that we can use it to sell only when the selling price > avg buying price
+        if action in [1, 2, 3]:            
             return action
         if (action in [-1, -2, -3]) and (cls.PreviousBuyCount>0) and (cls.PreviousBuyAverage < current_price):            
             return action
@@ -171,7 +182,7 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
         action = super().action(data, **kwargs)
         current_price = data[self.price_column].to_list()[-1]
         current_volume = data[self.volume_column].to_list()[-1]
-        action = cls.statefull_action( action, current_price, current_volume )
+        action = cls.statefull_action( action, current_price )
 
         if action == 0:
             trade_amount = 0
@@ -193,6 +204,7 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
             print('sold {} units at profit: {} avg buy price: {} current price: {}'.format( trade_amount, current_price-cls.PreviousBuyAverage, cls.PreviousBuyAverage, current_price))
             cls.TotalProfit = cls.TotalProfit + trade_amount*(current_price-cls.PreviousBuyAverage)
             cls.PreviousSellPrice = current_price
+            # maintaining a running average of our buying price so that we can use it to sell only when the selling price > avg buying price
             if cls.PreviousBuyCount - trade_amount == 0:
                 cls.PreviousBuyCount = 0
                 cls.PreviousBuyAverage = 0
@@ -201,8 +213,13 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
                 cls.PreviousBuyCount = cls.PreviousBuyCount - trade_amount
         elif action>0:
             print('bought {} units at {}/unit'.format(trade_amount, current_price))
-            cls.PreviousBuyCount = cls.PreviousBuyCount + trade_amount
-            cls.PreviousBuyAverage = cls.PreviousBuyAverage + trade_amount*(current_price - cls.PreviousBuyAverage)/float(cls.PreviousBuyCount)
+            # maintaining a running average of our buying price so that we can use it to sell only when the selling price > avg buying price
+            if cls.PreviousBuyCount + trade_amount == 0:
+                cls.PreviousBuyCount = 0
+                cls.PreviousBuyAverage = 0
+            else:
+                cls.PreviousBuyCount = cls.PreviousBuyCount + trade_amount
+                cls.PreviousBuyAverage = cls.PreviousBuyAverage + trade_amount*(current_price - cls.PreviousBuyAverage)/float(cls.PreviousBuyCount)
 
         if action!=0:
             print('total holding: {} at avg buy price: {}'.format(cls.PreviousBuyCount, cls.PreviousBuyAverage))
