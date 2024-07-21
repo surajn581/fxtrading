@@ -144,21 +144,23 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
     @classmethod
     def clear(cls):
-        cls.BaseTradeQuantity       = 1000
-        cls.PreviousBuyPrice        = np.inf
-        cls.PreviousSellPrice       = 0
-        cls.PreviousBuyAverage      = 0
-        cls.PreviousBuyCount        = 0
-        cls.TotalProfit             = 0    
-        cls.PreviousTickBuyMiss     = 0     #holds the quantity that is yet to be purchased
-        cls.PreviousTickSellMiss    = 0     #holds the quantity that is yet to be sold
+        cls.BaseTradeQuantity           = 1000
+        cls.PreviousBuyPrice            = np.inf
+        cls.PreviousSellPrice           = 0
+        cls.PreviousBuyAverage          = 0
+        cls.PreviousBuyCount            = 0
+        cls.TotalProfit                 = 0    
+        cls.PreviousTickBuyMiss         = 0     #holds the quantity that is yet to be purchased
+        cls.PreviousTickSellMiss        = 0     #holds the quantity that is yet to be sold
+        cls.PreviousTickBuyMissPrice    = 0
+        cls.PreviousTickSellMissPrice   = 0
 
     @classmethod
     def statefull_action(cls, action, current_price):
         if action == 0:
-            if cls.PreviousTickSellMiss:
+            if cls.PreviousTickSellMiss and (current_price >= cls.PreviousTickSellMissPrice):
                 action = 1            
-            elif cls.PreviousTickBuyMiss:
+            elif cls.PreviousTickBuyMiss and (current_price < cls.PreviousTickBuyMissPrice):
                 action = -1
             else:
                 return action
@@ -184,10 +186,17 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
         miss = max( trade_amount - current_volume, 0 )
         trade_amount = trade_amount - miss
-        if action>0:
+        if action>0 and miss:
             cls.PreviousTickBuyMiss = miss
-        elif action<0:
+            cls.PreviousTickBuyMissPrice = current_price
+        elif action<0 and miss:
             cls.PreviousTickSellMiss = miss
+            cls.PreviousTickSellMissPrice = current_price
+        if not miss:
+            cls.PreviousTickBuyMissPrice = 0
+            cls.PreviousTickSellMissPrice = 0
+            cls.PreviousTickBuyMiss = 0
+            cls.PreviousTickSellMiss = 0
 
         if action == 0:
             trade_amount = 0
