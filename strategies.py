@@ -145,7 +145,7 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
 
     @classmethod
     def clear(cls):
-        cls.CashInHand                  = 1000000
+        cls.CashInHand                  = 200000
         cls.BaseTradeQuantity           = 1000
         cls.PreviousBuyPrice            = np.inf
         cls.PreviousSellPrice           = 0
@@ -166,7 +166,7 @@ class StatefullCompositeStrategyBase( CompositeStrategyBase ):
                 action = 1
             else:
                 return action
-        if action in [1, 2, 3]:            
+        if action in [1, 2, 3] and cls.CashInHand>0:
             return action
         if (action in [-1, -2, -3]) and (cls.PreviousBuyCount>0) and (cls.PreviousBuyAverage < current_price):            
             return action
